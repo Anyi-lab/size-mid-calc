@@ -1,0 +1,16 @@
+# Rust 编译产物（别提交，体积巨大）
+/src-tauri/target/
+
+# Node
+node_modules/
+package-lock.json
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# 本地调试产物
+*.log

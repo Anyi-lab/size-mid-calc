@@ -1,0 +1,12 @@
+{
+  "name": "size-mid-calc",
+  "version": "1.0.0",
+  "description": "尺寸中间值计算 · 自动校验",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0"
+  }
+}

@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>尺寸中间值计算 · 自动校验</title>
+<style>
+:root{
+  --bg:#0b1220; --bg2:#0f172a; --panel:#1a2436; --panel2:#243149; --line:#33415c;
+  --fg:#e6edf7; --muted:#93a3bd; --accent:#38bdf8; --accent2:#818cf8;
+  --ok:#34d399; --warn:#fbbf24; --err:#f87171; --mid:#4ade80;
+  --r:14px;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+body{
+  background:
+    radial-gradient(1100px 520px at 12% -8%, rgba(56,189,248,.13), transparent 60%),
+    radial-gradient(900px 480px at 92% 0%, rgba(129,140,248,.11), transparent 55%),
+    linear-gradient(180deg, var(--bg2), var(--bg) 46%);
+  background-attachment:fixed;
+  color:var(--fg);
+  font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+  font-size:15px; line-height:1.6;
+  padding:0 0 56px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1140px; margin:0 auto; padding:0 22px}
+
+.topbar{position:sticky; top:0; z-index:40; backdrop-filter:blur(14px);
+  background:rgba(11,18,32,.82); border-bottom:1px solid rgba(51,65,92,.85)}
+.bar{display:flex; align-items:center; gap:14px; padding:13px 0}
+.logo{width:40px; height:40px; border-radius:12px; flex:0 0 auto; display:grid; place-items:center;
+  background:linear-gradient(140deg, #38bdf8, #818cf8); color:#07131f; font-weight:900; font-size:19px;
+  box-shadow:0 6px 20px rgba(56,189,248,.28)}
+h1{font-size:18px; font-weight:700; letter-spacing:.3px}
+.sub{color:var(--muted); font-size:12.5px; margin-top:1px}
+.spacer{flex:1}
+.badge{font-size:12.5px; padding:7px 14px; border-radius:999px; border:1px solid var(--line);
+  background:var(--panel); color:var(--muted); white-space:nowrap; font-weight:600; transition:.2s}
+.badge.ok{color:#06251a; background:linear-gradient(140deg,#4ade80,#34d399); border-color:transparent}
+.badge.warn{color:#2a1c00; background:linear-gradient(140deg,#fcd34d,#fbbf24); border-color:transparent}
+.badge.err{color:#2a0707; background:linear-gradient(140deg,#fca5a5,#f87171); border-color:transparent}
+
+.tabs{display:flex; gap:8px; margin:20px 0 16px; flex-wrap:wrap}
+.tab{padding:9px 20px; background:var(--panel); border:1px solid var(--line); border-radius:11px;
+  cursor:pointer; font-size:14px; color:var(--muted); font-family:inherit; font-weight:600; transition:.16s}
+.tab:hover{color:var(--fg); border-color:#48597a; transform:translateY(-1px)}
+.tab:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.tab.active{background:linear-gradient(140deg,var(--accent),#60a5fa); border-color:transparent; color:#06202e;
+  box-shadow:0 6px 18px rgba(56,189,248,.25)}
+.page{display:none}
+.page.active{display:block; animation:fade .22s ease}
+@keyframes fade{from{opacity:0; transform:translateY(5px)} to{opacity:1; transform:none}}
+
+.panel{background:linear-gradient(180deg, rgba(36,49,73,.55), rgba(26,36,54,.9));
+  border:1px solid var(--line); border-radius:var(--r); padding:20px; margin-bottom:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.22)}
+.panel h2{font-size:13px; letter-spacing:1.2px; color:var(--accent);
+  margin-bottom:14px; display:flex; align-items:center; gap:8px; font-weight:700}
+.panel h2::before{content:""; width:3px; height:14px; border-radius:2px;
+  background:linear-gradient(180deg,var(--accent),var(--accent2))}
+
+label{display:block; font-size:12px; color:var(--muted); margin-bottom:7px; font-weight:600; letter-spacing:.3px}
+input[type=text],select,textarea{width:100%; padding:12px 14px; background:#111b2b; border:1px solid var(--line);
+  color:var(--fg); border-radius:10px; font-size:15px; outline:none; font-family:inherit; transition:.16s}
+input[type=text]:hover,select:hover,textarea:hover{border-color:#48597a}
+input[type=text]:focus,select:focus,textarea:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(56,189,248,.16)}
+input.invalid{border-color:var(--err); box-shadow:0 0 0 3px rgba(248,113,113,.15)}
+#quick{font-family:Consolas,"Courier New",monospace; font-size:19px; letter-spacing:1px; padding:15px 120px 15px 16px}
+textarea{min-height:186px; font-family:Consolas,"Courier New",monospace; font-size:14px; line-height:1.75; resize:vertical}
+select{width:auto; min-width:118px; cursor:pointer; padding-right:34px; appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 17px) 55%, calc(100% - 12px) 55%; background-size:5px 5px,5px 5px; background-repeat:no-repeat}
+
+.row3{display:grid; grid-template-columns:1.25fr 1fr 1fr; gap:14px}
+@media(max-width:820px){.row3{grid-template-columns:1fr}}
+.quickwrap{position:relative}
+.quickwrap .kbd{position:absolute; right:14px; top:50%; transform:translateY(-50%); font-size:11px;
+  color:var(--muted); border:1px solid var(--line); border-radius:6px; padding:2px 8px; background:#0d1626}
+
+.btn{display:inline-flex; align-items:center; gap:7px; padding:11px 22px; border:none; border-radius:10px;
+  font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; transition:.16s;
+  background:linear-gradient(140deg,var(--accent),#60a5fa); color:#06202e;
+  box-shadow:0 6px 18px rgba(56,189,248,.22)}
+.btn:hover{filter:brightness(1.07); transform:translateY(-1px)}
+.btn:active{transform:translateY(0) scale(.99)}
+.btn.ghost{background:var(--panel2); color:var(--fg); border:1px solid var(--line); box-shadow:none}
+.btn.ghost:hover{border-color:#54688d; background:#2a3a56}
+.btnbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:16px}
+.btnbar .sp{font-size:12px; color:var(--muted); margin-left:4px; font-weight:600}
+
+.res{display:grid; grid-template-columns:repeat(auto-fit,minmax(178px,1fr)); gap:12px; margin-top:18px}
+.card{background:#0d1626; border:1px solid var(--line); border-radius:12px; padding:14px 16px;
+  transition:.16s; cursor:pointer; position:relative; overflow:hidden}
+.card:hover{border-color:#4a5f85; transform:translateY(-2px)}
+.card .k{font-size:11.5px; color:var(--muted); margin-bottom:7px; letter-spacing:.4px; font-weight:600}
+.card .v{font-size:21px; font-weight:700; font-variant-numeric:tabular-nums; font-family:Consolas,"Courier New",monospace}
+.card .u{font-size:12px; color:var(--muted); margin-left:4px; font-weight:400; font-family:"Segoe UI",sans-serif}
+.card.main{grid-column:span 2; border-color:rgba(74,222,128,.55);
+  background:linear-gradient(140deg, rgba(74,222,128,.13), rgba(13,22,38,.92) 62%);
+  box-shadow:0 0 0 1px rgba(74,222,128,.12), 0 12px 30px rgba(16,80,50,.28)}
+.card.main .k{color:#86efac}
+.card.main .v{font-size:40px; color:var(--mid); letter-spacing:.5px; line-height:1.15}
+.card.main::after{content:"中间值"; position:absolute; right:-10px; bottom:-14px; font-size:56px; font-weight:900;
+  color:rgba(74,222,128,.06); letter-spacing:2px; pointer-events:none}
+@media(max-width:640px){.card.main{grid-column:span 1}}
+
+.verify{margin-top:16px}
+.vhead{display:flex; align-items:center; gap:12px; padding:13px 16px; border-radius:11px;
+  border:1px solid var(--line); background:#0d1626; margin-bottom:12px; flex-wrap:wrap}
+.vhead .ico{width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-size:16px; font-weight:900}
+.vhead.pass{border-color:rgba(74,222,128,.5); background:linear-gradient(140deg,rgba(74,222,128,.12),#0d1626)}
+.vhead.pass .ico{background:rgba(74,222,128,.18); color:var(--mid)}
+.vhead.warn{border-color:rgba(251,191,36,.5); background:linear-gradient(140deg,rgba(251,191,36,.1),#0d1626)}
+.vhead.warn .ico{background:rgba(251,191,36,.16); color:var(--warn)}
+.vhead.fail{border-color:rgba(248,113,113,.55); background:linear-gradient(140deg,rgba(248,113,113,.12),#0d1626)}
+.vhead.fail .ico{background:rgba(248,113,113,.16); color:var(--err)}
+.vhead .txt{font-size:14.5px; font-weight:700}
+.vhead .cnt{font-size:12.5px; color:var(--muted); margin-left:auto; font-variant-numeric:tabular-nums}
+.vlist{list-style:none; display:grid; gap:7px}
+.vlist li{display:grid; grid-template-columns:20px 1fr; gap:11px; align-items:start;
+  padding:9px 13px; border-radius:9px; background:rgba(17,27,43,.72); border:1px solid rgba(51,65,92,.6)}
+.vlist li .i{font-size:13px; line-height:1.5; text-align:center; font-weight:900}
+.vlist li.ok .i{color:var(--ok)}
+.vlist li.warn{border-color:rgba(251,191,36,.35); background:rgba(251,191,36,.06)}
+.vlist li.warn .i{color:var(--warn)}
+.vlist li.fail{border-color:rgba(248,113,113,.4); background:rgba(248,113,113,.07)}
+.vlist li.fail .i{color:var(--err)}
+.vlist .nm{font-size:13.5px; font-weight:600}
+.vlist .dt{font-size:12.5px; color:var(--muted); font-family:Consolas,"Courier New",monospace;
+  margin-top:2px; word-break:break-all}
+.checkrow{margin-top:14px; padding:13px 15px; border-radius:11px; background:rgba(17,27,43,.72);
+  border:1px solid rgba(51,65,92,.6)}
+.checkrow .cin{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center}
+.actres{margin-top:11px; font-size:13.5px; font-family:Consolas,"Courier New",monospace; line-height:1.95}
+.actres .tag{display:inline-block; padding:3px 12px; border-radius:999px; font-weight:700; margin-right:10px;
+  font-family:"Segoe UI",sans-serif; font-size:12.5px}
+.actres .tag.ok{background:rgba(74,222,128,.16); color:var(--mid); border:1px solid rgba(74,222,128,.4)}
+.actres .tag.bad{background:rgba(248,113,113,.16); color:var(--err); border:1px solid rgba(248,113,113,.4)}
+.btn.sm{padding:6px 14px; font-size:12.5px; border-radius:8px}
+.panel h2 .rt{margin-left:auto}
+
+table{width:100%; border-collapse:collapse; font-size:13.5px}
+th,td{padding:9px 11px; border-bottom:1px solid rgba(51,65,92,.7); text-align:right; white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+th{color:var(--muted); font-size:11.5px; font-weight:700; letter-spacing:.5px; background:#152036;
+  position:sticky; top:0; z-index:2}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+tbody tr:nth-child(even){background:rgba(36,49,73,.22)}
+tbody tr:hover{background:rgba(56,189,248,.08)}
+td.mid{color:var(--mid); font-weight:700}
+td.chk{text-align:center; font-weight:900}
+td.chk.ok{color:var(--ok)} td.chk.warn{color:var(--warn)} td.chk.fail{color:var(--err)}
+td.err{color:var(--err); text-align:left; white-space:normal}
+.tblwrap{max-height:56vh; overflow:auto; border:1px solid var(--line); border-radius:11px; margin-top:14px}
+.tblwrap::-webkit-scrollbar{width:10px; height:10px}
+.tblwrap::-webkit-scrollbar-thumb{background:#3a4c6b; border-radius:6px}
+
+.hint{font-size:12px; color:var(--muted); line-height:1.95; margin-top:11px}
+.hint code{background:#111b2b; border:1px solid var(--line); padding:1px 7px; border-radius:5px;
+  color:var(--accent); font-family:Consolas,monospace; font-size:11.5px}
+.note{font-size:12.5px; color:var(--muted); margin-top:13px; line-height:1.9; word-break:break-all;
+  font-family:Consolas,"Courier New",monospace; padding:11px 13px; background:rgba(17,27,43,.7);
+  border:1px solid rgba(51,65,92,.6); border-radius:9px}
+.note b{color:var(--mid)}
+.stat{font-size:12.5px; color:var(--muted); margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+.stat .pill{padding:4px 12px; border-radius:999px; background:#111b2b; border:1px solid var(--line); font-weight:600}
+.stat .pill.ok{color:var(--ok); border-color:rgba(52,211,153,.35)}
+.stat .pill.warn{color:var(--warn); border-color:rgba(251,191,36,.35)}
+.stat .pill.err{color:var(--err); border-color:rgba(248,113,113,.35)}
+
+.doc{font-size:14px; line-height:2.05; color:#cbd5e1}
+.doc b{color:var(--accent2)}
+.doc .em{color:var(--mid); font-weight:700}
+.doc hr{border:none; border-top:1px solid var(--line); margin:15px 0}
+.doc table{margin:10px 0 4px; font-size:13px}
+.doc td,.doc th{border-bottom:1px solid rgba(51,65,92,.7); text-align:left; white-space:normal}
+.doc td:first-child{color:var(--muted); width:38%}
+
+#toast{position:fixed; left:50%; bottom:32px; transform:translate(-50%,14px); background:#0d1626;
+  border:1px solid rgba(74,222,128,.55); color:var(--mid); padding:11px 22px; border-radius:11px;
+  font-size:13.5px; font-weight:600; opacity:0; pointer-events:none; transition:.24s; z-index:99;
+  box-shadow:0 12px 34px rgba(0,0,0,.45)}
+#toast.show{opacity:1; transform:translate(-50%,0)}
+/* 行明细（点批量表格的行展开） */
+.rowv{padding:12px 14px}
+.rowvh{font-size:12px; color:var(--accent); font-weight:700; margin-bottom:9px; letter-spacing:.5px}
+.rowdetail > td{padding:0 !important; background:rgba(56,189,248,.05) !important;
+  border-bottom:1px solid var(--line)}
+.rowdetail .vlist li{padding:7px 11px}
+
+/* 打印 / 存 PDF：白底黑字，去掉交互元素，避免深色主题打出一片空白 */
+@page{margin:14mm}
+@media print{
+  body{background:#fff !important; color:#111 !important; padding:0 !important}
+  .topbar,.tabs,.btnbar,.hint,.note,.checkrow,#toast,.checkrow,.panel h2 .rt{display:none !important}
+  .panel{background:#fff !important; border:1px solid #bbb !important; box-shadow:none !important;
+    page-break-inside:avoid; margin-bottom:10px}
+  .panel h2{color:#111 !important}
+  .panel h2::before{background:#111 !important}
+  .card{background:#fff !important; border:1px solid #bbb !important}
+  .card .k{color:#444 !important}
+  .card .v{color:#111 !important}
+  .card.main{border:2px solid #111 !important; background:#fff !important}
+  .card.main .v{color:#000 !important}
+  .card.main .k{color:#000 !important}
+  .card.main::after{display:none !important}
+  .vhead{background:#fff !important; border-color:#bbb !important}
+  .vhead .txt{color:#111 !important}
+  .vhead .ico{background:#fff !important; border:1px solid #666 !important}
+  .vlist li{background:#fff !important; border-color:#ccc !important; color:#111 !important}
+  .vlist .dt{color:#333 !important}
+  .vlist .nm{color:#111 !important}
+  .badge{background:#fff !important; border:1px solid #333 !important; color:#111 !important}
+  table th{background:#e8e8e8 !important; color:#111 !important}
+  th,td{border-color:#bbb !important; color:#111 !important}
+  td.mid{color:#000 !important; background:#eaf7ea !important}
+  .tblwrap{max-height:none !important; overflow:visible !important; border:1px solid #bbb !important}
+  .rowv,.rowdetail > td{background:#f6f9f6 !important}
+  .rowvh{color:#111 !important}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap bar">
+    <div class="logo">M</div>
+    <div>
+      <h1>尺寸中间值计算</h1>
+      <div class="sub">中间值 = 基本尺寸 + (上偏差 + 下偏差) ÷ 2 · 每次计算自动校验</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="badge" id="badge">待输入</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab active" data-page="single">单件计算</button>
+    <button class="tab" data-page="batch">批量计算</button>
+    <button class="tab" data-page="doc">公式与校验规则</button>
+  </div>
+
+  <div class="page active" id="page-single">
+    <div class="panel">
+      <h2>整行输入</h2>
+      <div class="quickwrap">
+        <input type="text" id="quick" placeholder="238.25 0.00 -0.51">
+        <span class="kbd">Enter 计算</span>
+      </div>
+      <div class="hint">支持 <code>基本尺寸 上偏差 下偏差</code> · <code>238.25 +0.00/-0.51</code> · <code>238.25±0.13</code> · <code>238.25-0.51</code>（只给一个负偏差时上偏差按 0 算）</div>
+    </div>
+
+    <div class="panel">
+      <h2>分项输入</h2>
+      <div class="row3">
+        <div><label>基本尺寸 D</label><input type="text" id="nom" placeholder="238.25"></div>
+        <div><label>上偏差 ES</label><input type="text" id="es" placeholder="0.00"></div>
+        <div><label>下偏差 EI</label><input type="text" id="ei" placeholder="-0.51"></div>
+      </div>
+      <div class="btnbar">
+        <button class="btn" id="calc1">计算并校验</button>
+        <button class="btn ghost" id="clear1">清空</button>
+        <button class="btn ghost" id="copy1">复制结果</button>
+        <span class="sp">精度</span>
+        <select id="dec1"></select>
+      </div>
+      <div class="note" id="note1" style="display:none"></div>
+      <div class="res" id="res1" style="display:none"></div>
+    </div>
+
+    <div class="panel verify" id="vpanel" style="display:none">
+      <h2>结果验证<button class="btn ghost sm rt" id="copyReport">复制校验报告</button></h2>
+      <div class="vhead" id="vhead"></div>
+      <ul class="vlist" id="vlist"></ul>
+      <div class="checkrow">
+        <label>实测值判定（选填）：输入加工后实测尺寸，自动判定合格 / 超差</label>
+        <div class="cin">
+          <input type="text" id="actual" placeholder="例如 237.98">
+          <button class="btn ghost sm" id="clearActual">清除</button>
+        </div>
+        <div class="actres" id="actres"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-batch">
+    <div class="panel">
+      <h2>批量输入 · 每行一个尺寸</h2>
+      <textarea id="bulk" placeholder="238.25 0.00 -0.51&#10;120 0.05 -0.05&#10;45.5 +0.10/-0.02&#10;60±0.05&#10;32.4 -0.15"></textarea>
+      <div class="btnbar">
+        <button class="btn" id="calc2">计算并校验</button>
+        <button class="btn ghost" id="copyAll">复制表格</button>
+        <button class="btn ghost" id="copyMid">只复制中间值</button>
+        <button class="btn ghost" id="exportCsv">导出 CSV</button>
+        <button class="btn ghost" id="sample">填入示例</button>
+        <button class="btn ghost" id="clear2">清空</button>
+        <span class="sp">精度</span>
+        <select id="dec2"></select>
+      </div>
+      <div class="hint">可从 Excel 明细表整列粘贴 · 空行和表头自动跳过 · 支持空格 / Tab / 逗号分隔 · <code>Ctrl + Enter</code> 计算 · <b>点表格任意一行可展开该行的 8 项校验明细</b> · 直接 Ctrl+P 可打印（已适配白底黑字）</div>
+      <div class="stat" id="stat2"></div>
+      <div class="tblwrap" id="tblwrap" style="display:none"><table id="tbl"></table></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-doc">
+    <div class="panel">
+      <h2>计算规则</h2>
+      <div class="doc">
+        设基本尺寸 <b>D</b>，上偏差 <b>ES</b>，下偏差 <b>EI</b>
+        <table>
+          <tr><td>最大极限尺寸</td><td>D + ES</td></tr>
+          <tr><td>最小极限尺寸</td><td>D + EI</td></tr>
+          <tr><td>公差</td><td>T = ES − EI</td></tr>
+          <tr><td>中差（偏差中间值）</td><td>(ES + EI) ÷ 2</td></tr>
+          <tr><td>中间值</td><td><span class="em">D + (ES + EI) ÷ 2 = (最大 + 最小) ÷ 2</span></td></tr>
+        </table>
+        <hr>
+        <b>算例：238.25 0.00 -0.51</b><br>
+        最大 = 238.25 + 0.00 = 238.250　最小 = 238.25 + (−0.51) = 237.740<br>
+        公差 = 0.00 − (−0.51) = 0.510　中差 = (0.00 + (−0.51)) ÷ 2 = −0.255<br>
+        <span class="em">中间值 = 238.25 + (−0.255) = 237.995</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>校验规则（每项显示实际算式）</h2>
+      <div class="doc">
+        <table>
+          <tr><td>① 数值有效</td><td>基本尺寸与上下偏差均可解析为数字</td></tr>
+          <tr><td>② 上偏差 ≥ 下偏差</td><td>否则按大小自动重排并提示</td></tr>
+          <tr><td>③ 公差大于 0</td><td>公差为 0 时提示（无加工余量）</td></tr>
+          <tr><td>④ 极限尺寸顺序</td><td>最小 ≤ 中间值 ≤ 最大</td></tr>
+          <tr><td>⑤ 中间值 = (最大 + 最小) ÷ 2</td><td>用极限尺寸反推中间值，与结果比对</td></tr>
+          <tr><td>⑥ 中间值 = 基本尺寸 + 中差</td><td>用偏差路线独立复算一次</td></tr>
+          <tr><td>⑦ 独立整数复算</td><td>把数值放大成整数（微米级）再算一遍，与小数运算逐位比对，排除浮点误差</td></tr>
+          <tr><td>⑧ 反算上下极限</td><td>中间值 ± 公差÷2 应还原出最大 / 最小极限尺寸</td></tr>
+          <tr><td>⑨ 显示取整提示</td><td>结果被舍入显示时给出原值提示</td></tr>
+        </table>
+        <hr>
+        精度选「自动」时：小数位按输入自动取；中差多一位时自动补一位（如 0.51 → 0.255）。<br>
+        批量模式每行单独校验，结果列显示 <span style="color:#34d399">✔</span> 通过 / <span style="color:#fbbf24">⚠</span> 提示 / <span style="color:#f87171">✖</span> 异常。
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ================= 计算核心 ================= */
+function normv(s){
+  return String(s)
+    .replace(/＋/g, '+')
+    .replace(/[－—–−﹣]/g, '-')
+    .replace(/[。．]/g, '.')
+    .replace(/[，、；;]/g, ' ');
+}
+
+function decOf(str){
+  var t = String(str).replace(/[^0-9.]/g, '');
+  var m = t.match(/\.(\d+)/);
+  return m ? m[1].length : 0;
+}
+
+function roundTo(v, d){
+  if (!isFinite(v)) return v;
+  if (d < 0) d = 0;
+  if (d > 6) d = 6;
+  var p = Math.pow(10, d);
+  /* 先按 15 位有效数字消掉乘法噪声，再四舍五入。
+     原来的 ±1e-12 绝对扰动在数值大时（如 123456.785）会被浮点误差吃掉。 */
+  var x = Number((Math.abs(v) * p).toPrecision(15));
+  var r = Math.round(x) / p;
+  if (r === 0 || Math.abs(r) < 1e-12) return 0;
+  return v < 0 ? -r : r;
+}
+
+function fmt(v, d){
+  if (!isFinite(v)) return '—';
+  var s = roundTo(v, d).toFixed(d);
+  if (/^-0(\.0+)?$/.test(s)) s = (0).toFixed(d);
+  return s;
+}
+
+function sgn(v, d){
+  var rv = roundTo(v, d);
+  if (rv === 0) return '+' + fmt(0, d);
+  return (rv > 0 ? '+' : '') + fmt(rv, d);
+}
+
+function fmtTrim(v){
+  var s = fmt(v, 6);
+  if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+  return s;
+}
+
+function parseLine(line, strict){
+  var raw = String(line);
+  var t = raw.trim();
+  if (!t) return null;
+  var s = normv(t).replace(/\t/g, ' ')
+    .replace(/([+-])\s+(?=\d)/g, '$1')   /* "0.10 - 0.02" → "0.10 -0.02" */
+    .replace(/\s+/g, ' ')
+    .trim();
+  var out = { raw: t, nominal: 0, es: 0, ei: 0, decN: 0, decS: 0, decI: 0, warn: '', err: '' };
+
+  var pm = s.match(/^([+-]?\d*\.?\d+)\s*±\s*(\d*\.?\d+)$/);
+  if (pm) {
+    out.nominal = parseFloat(pm[1]);
+    var dv = parseFloat(pm[2]);
+    out.es = dv;
+    out.ei = -dv;
+    out.decN = decOf(pm[1]);
+    out.decS = decOf(pm[2]);
+    out.decI = decOf(pm[2]);
+    if (isNaN(out.nominal) || isNaN(dv)) out.err = '数值无法识别';
+    return out;
+  }
+
+  var toks = s.match(/[+-]?\d*\.?\d+/g);
+  if (!toks || !toks.length) { out.err = '没有识别到数字'; return out; }
+
+  /* 整行输入（strict）时，除数字/分隔符/单位符号外还有别的字符就报错，
+     避免 "abc 1" 这类输入被静默当成 D=1 算出一个像模像样的结果。
+     批量模式不开 strict：Excel 整列粘贴常有"规格/上限/下限"这类表头行。 */
+  if (strict) {
+    var rest = s.replace(/[+-]?\d*\.?\d+/g, '')
+      .replace(/[±\/,\s]/g, '')
+      .replace(/mm|Ф|⌀|Φ|φ|Ø|ø|R/gi, '');
+    if (rest) { out.err = '无法识别的字符「' + rest.slice(0, 12) + '」'; return out; }
+  }
+
+  out.nominal = parseFloat(toks[0]);
+  out.decN = decOf(toks[0]);
+
+  if (toks.length === 2) {
+    var v2 = parseFloat(toks[1]);
+    if (v2 <= 0) { out.es = 0; out.ei = v2; out.decS = 0; out.decI = decOf(toks[1]); }
+    else { out.es = v2; out.ei = 0; out.decS = decOf(toks[1]); out.decI = 0; }
+  } else if (toks.length >= 3) {
+    out.es = parseFloat(toks[1]);
+    out.ei = parseFloat(toks[2]);
+    out.decS = decOf(toks[1]);
+    out.decI = decOf(toks[2]);
+    if (out.es < out.ei) {
+      var tmp = out.es; out.es = out.ei; out.ei = tmp;
+      var td = out.decS; out.decS = out.decI; out.decI = td;
+      out.warn = '上下偏差已按大小重排';
+    }
+    if (toks.length > 3) out.warn = (out.warn ? out.warn + '；' : '') + '本行有 ' + toks.length + ' 个数字，只取前三个';
+  }
+
+  if (isNaN(out.nominal) || isNaN(out.es) || isNaN(out.ei)) out.err = '数值无法识别';
+  return out;
+}
+
+function pickDec(o){
+  var base = Math.max(o.decN || 0, o.decS || 0, o.decI || 0);
+  var d = base;
+  while (d < 6 && Math.abs(roundTo(o.midDev, d) - o.midDev) > 1e-9) d++;
+  return d;
+}
+
+function compute(item, decMode){
+  var nominal = item.nominal, es = item.es, ei = item.ei;
+  var midDev = (es + ei) / 2;
+  var r = {
+    nominal: nominal, es: es, ei: ei,
+    hi: nominal + es, lo: nominal + ei,
+    tol: es - ei,
+    midDev: midDev, mid: nominal + midDev,
+    decN: item.decN || 0, decS: item.decS || 0, decI: item.decI || 0
+  };
+  if (decMode === undefined || decMode === 'auto') {
+    r.dec = pickDec({ decN: r.decN, decS: r.decS, decI: r.decI, midDev: midDev });
+  } else {
+    r.dec = parseInt(decMode, 10);
+    if (isNaN(r.dec)) r.dec = 3;
+  }
+  return r;
+}
+
+function parseNumField(s){
+  var t = normv(String(s == null ? '' : s)).trim();
+  if (!t) return { v: 0, dec: 0, empty: true };
+  if (!/^[+-]?\d*\.?\d+$/.test(t)) return { v: NaN, dec: 0, empty: false };
+  return { v: parseFloat(t), dec: decOf(t), empty: false };
+}
+
+/* ================= 验证核心 ================= */
+function intCheck(item, r){
+  var D = Math.min(6, Math.max(item.decN || 0, item.decS || 0, item.decI || 0, r.dec));
+  var p = Math.pow(10, D);
+  var n = Math.round(item.nominal * p);
+  var a = Math.round(item.es * p);
+  var b = Math.round(item.ei * p);
+  var mid = (2 * n + a + b) / (2 * p);
+  var hi = (n + a) / p;
+  var lo = (n + b) / p;
+  var tol = (a - b) / p;
+  var ok = Math.abs(mid - r.mid) < 1e-9 && Math.abs(hi - r.hi) < 1e-9 &&
+           Math.abs(lo - r.lo) < 1e-9 && Math.abs(tol - r.tol) < 1e-9;
+  return { ok: ok, mid: mid, hi: hi, lo: lo, tol: tol, D: D };
+}
+
+function verify(item, r){
+  var d = r.dec;
+  var items = [];
+  function push(name, ok, detail, level){
+    items.push({ name: name, ok: !!ok, detail: detail, level: level || (ok ? 'ok' : 'fail') });
+  }
+
+  var finite = isFinite(r.nominal) && isFinite(r.es) && isFinite(r.ei) && isFinite(r.mid) && isFinite(r.tol);
+  push('数值有效', finite,
+    finite ? 'D = ' + fmt(r.nominal, d) + '，ES = ' + sgn(r.es, d) + '，EI = ' + sgn(r.ei, d) : '存在非法数值');
+
+  push('上偏差 ≥ 下偏差', r.es >= r.ei, 'ES ' + sgn(r.es, d) + ' ≥ EI ' + sgn(r.ei, d));
+
+  if (Math.abs(r.tol) < 1e-12) {
+    push('公差大于 0', false, 'T = 0，上下偏差相同（该尺寸没有加工余量）', 'warn');
+  } else {
+    push('公差大于 0', r.tol > 0, 'T = ES − EI = ' + fmt(r.tol, d));
+  }
+
+  push('极限尺寸顺序', r.lo <= r.mid + 1e-12 && r.mid <= r.hi + 1e-12,
+    fmt(r.lo, d) + ' ≤ ' + fmt(r.mid, d) + ' ≤ ' + fmt(r.hi, d));
+
+  var midByLimits = (r.hi + r.lo) / 2;
+  push('中间值 = (最大 + 最小) ÷ 2', Math.abs(midByLimits - r.mid) < 1e-9,
+    '(' + fmt(r.hi, d) + ' + ' + fmt(r.lo, d) + ') ÷ 2 = ' + fmt(midByLimits, d));
+
+  var midByBias = r.nominal + (r.es + r.ei) / 2;
+  var biasTxt = (r.midDev >= 0 ? '+ ' + fmt(r.midDev, d) : '− ' + fmt(-r.midDev, d));
+  push('中间值 = 基本尺寸 + 中差', Math.abs(midByBias - r.mid) < 1e-9,
+    fmt(r.nominal, d) + ' ' + biasTxt + ' = ' + fmt(midByBias, d));
+
+  var ic = intCheck(item, r);
+  push('独立整数复算一致', ic.ok,
+    '按 10^' + ic.D + ' 放大成整数复算：中间值 ' + fmt(ic.mid, d) + '，最大 ' + fmt(ic.hi, d) +
+    '，最小 ' + fmt(ic.lo, d) + '，公差 ' + fmt(ic.tol, d));
+
+  var backHi = r.mid + r.tol / 2;
+  var backLo = r.mid - r.tol / 2;
+  push('反算上下极限', Math.abs(backHi - r.hi) < 1e-9 && Math.abs(backLo - r.lo) < 1e-9,
+    fmt(r.mid, d) + ' ± ' + fmt(r.tol / 2, d) + ' → ' + fmt(backLo, d) + ' ~ ' + fmt(backHi, d));
+
+  var rounded = roundTo(r.mid, d);
+  if (Math.abs(rounded - r.mid) > 1e-12) {
+    push('显示取整提示', true,
+      '中间值原值 ' + fmtTrim(r.mid) + '，当前按 ' + d + ' 位小数显示为 ' + fmt(r.mid, d) + '（有舍入）', 'warn');
+  } else {
+    /* 原来没有舍入时这一项直接不加，导致"9 项检查"经常只显示 8 项、徽标显示 8/9，
+       和文档写的 9 项对不上。现在恒定 9 项。 */
+    push('显示取整提示', true, '中间值 ' + fmt(r.mid, d) + ' 按 ' + d + ' 位小数可精确显示，无舍入');
+  }
+
+  var fail = 0, warn = 0;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].level === 'fail') fail++;
+    else if (items[i].level === 'warn') warn++;
+  }
+  return { ok: fail === 0, fail: fail, warn: warn, total: items.length, items: items };
+}
+
+/* ================= 界面 ================= */
+var lastRows = [];
+var lastSingle = null;
+
+function el(id){ return document.getElementById(id); }
+
+function toast(msg){
+  var t = el('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = 'show';
+  setTimeout(function(){ t.className = ''; }, 1500);
+}
+
+function copyText(text){
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function(){ toast('已复制'); }, function(){ fallbackCopy(text); });
+    return;
+  }
+  fallbackCopy(text);
+}
+
+function fallbackCopy(text){
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); toast('已复制'); }
+  catch (e) { alert('复制失败，请手动选择文本'); }
+  document.body.removeChild(ta);
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function card(key, val, unit, cls, copyVal){
+  return '<div class="card' + (cls ? ' ' + cls : '') + '" data-copy="' + escHtml(copyVal || val) + '">' +
+    '<div class="k">' + key + '</div><div class="v">' + val +
+    (unit ? '<span class="u">' + unit + '</span>' : '') + '</div></div>';
+}
+
+function setBadge(kind, text){
+  var b = el('badge');
+  if (!b) return;
+  b.className = 'badge' + (kind ? ' ' + kind : '');
+  b.textContent = text;
+}
+
+function renderVerify(v){
+  var head = el('vhead');
+  var list = el('vlist');
+  var cls = v.ok ? (v.warn ? 'warn' : 'pass') : 'fail';
+  var icon = v.ok ? (v.warn ? '!' : '✓') : '×';
+  var txt = v.ok ? (v.warn ? '校验通过（有提示）' : '校验通过') : '校验未通过';
+
+  head.className = 'vhead ' + cls;
+  head.innerHTML = '<div class="ico">' + icon + '</div><div class="txt">' + txt + '</div>' +
+    '<div class="cnt">' + v.total + ' 项检查 · 异常 ' + v.fail + ' · 提示 ' + v.warn + '</div>';
+
+  var h = '';
+  for (var i = 0; i < v.items.length; i++) {
+    var it = v.items[i];
+    var mark = it.level === 'fail' ? '×' : (it.level === 'warn' ? '!' : '✓');
+    h += '<li class="' + it.level + '"><div class="i">' + mark + '</div><div>' +
+      '<div class="nm">' + it.name + '</div><div class="dt">' + it.detail + '</div></div></li>';
+  }
+  list.innerHTML = h;
+  el('vpanel').style.display = 'block';
+  setBadge(cls, txt + ' · ' + (v.total - v.fail - v.warn) + '/' + v.total);
+}
+
+function runSingle(){
+  var n = parseNumField(el('nom').value);
+  var a = parseNumField(el('es').value);
+  var b = parseNumField(el('ei').value);
+  var box = el('res1'), note = el('note1'), vpanel = el('vpanel');
+
+  if (n.empty && a.empty && b.empty) {
+    box.style.display = 'none';
+    note.style.display = 'none';
+    vpanel.style.display = 'none';
+    setBadge('', '待输入');
+    return;
+  }
+
+  el('nom').className = isNaN(n.v) ? 'invalid' : '';
+  el('es').className = isNaN(a.v) ? 'invalid' : '';
+  el('ei').className = isNaN(b.v) ? 'invalid' : '';
+
+  if (isNaN(n.v) || isNaN(a.v) || isNaN(b.v)) {
+    box.style.display = 'none';
+    vpanel.style.display = 'none';
+    note.style.display = 'block';
+    note.textContent = '有数值无法识别，请检查输入（只填数字，可带正负号）。';
+    setBadge('err', '输入无效');
+    return;
+  }
+
+  var item = { nominal: n.v, es: a.v, ei: b.v, decN: n.dec, decS: a.dec, decI: b.dec };
+  var warnMsg = '';
+  if (item.es < item.ei) {
+    var tmp = item.es; item.es = item.ei; item.ei = tmp;
+    var td = item.decS; item.decS = item.decI; item.decI = td;
+    warnMsg = '上下偏差已按大小重排';
+  }
+
+  var r = compute(item, el('dec1').value);
+  var d = r.dec;
+
+  var html = '';
+  html += card('中间值（中差尺寸）', fmt(r.mid, d), 'mm', 'main');
+  html += card('最大极限尺寸', fmt(r.hi, d), 'mm');
+  html += card('最小极限尺寸', fmt(r.lo, d), 'mm');
+  html += card('公差', fmt(r.tol, d), 'mm');
+  html += card('中差（偏差中间值）', sgn(r.midDev, d), 'mm');
+  html += card('上偏差 ES', sgn(r.es, d), 'mm');
+  html += card('下偏差 EI', sgn(r.ei, d), 'mm');
+  box.innerHTML = html;
+  box.style.display = 'grid';
+
+  note.style.display = 'block';
+  var eiTxt = (r.ei >= 0 ? '+ ' + fmt(r.ei, d) : '− ' + fmt(-r.ei, d));
+  note.innerHTML = '中间值 = ' + fmt(r.nominal, d) + ' + (' + sgn(r.es, d) + ' ' + eiTxt + ') ÷ 2 = <b>' +
+    fmt(r.mid, d) + '</b>' + (warnMsg ? '　｜　<span style="color:#fbbf24">' + warnMsg + '</span>' : '');
+
+  var v = verify(item, r);
+  renderVerify(v);
+
+  lastSingle = { item: item, r: r, v: v };
+  runActual();
+  saveState();
+}
+
+function runActual(){
+  var box = el('actres');
+  if (!box) return;
+  if (!lastSingle) { box.innerHTML = ''; return; }
+  var t = parseNumField(el('actual').value);
+  if (t.empty) { box.innerHTML = ''; return; }
+  if (isNaN(t.v)) { box.innerHTML = '<span class="tag bad">无效</span>实测值无法识别'; return; }
+  var r = lastSingle.r, d = r.dec, v = t.v;
+  var pass = v >= r.lo - 1e-9 && v <= r.hi + 1e-9;
+  var tag = pass ? '<span class="tag ok">合格</span>' : '<span class="tag bad">超差</span>';
+  var line1 = tag + '实测 ' + fmt(v, d) + '　中间值 ' + fmt(r.mid, d) + '　偏差 ' + sgn(v - r.mid, d);
+  var line2;
+  if (pass) {
+    line2 = '距最近极限余量 ' + fmt(Math.min(v - r.lo, r.hi - v), d) + ' mm（允许 ' + fmt(r.lo, d) + ' ~ ' + fmt(r.hi, d) + '）';
+  } else {
+    line2 = (v > r.hi ? '超出上限 ' + fmt(v - r.hi, d) : '低于下限 ' + fmt(r.lo - v, d)) +
+      ' mm（允许 ' + fmt(r.lo, d) + ' ~ ' + fmt(r.hi, d) + '）';
+  }
+  box.innerHTML = line1 + '<br>' + line2;
+}
+
+function runBatch(){
+  var lines = String(el('bulk').value).split(/\r?\n/);
+  var decMode = el('dec2').value;
+  var rows = [];
+  var skipped = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var lineTxt = lines[i].trim();
+    if (!lineTxt) continue;
+    if (!/\d/.test(normv(lineTxt))) { skipped++; continue; }
+    var it = parseLine(lines[i]);
+    if (!it) continue;
+    if (it.err) { rows.push({ err: it.err, raw: it.raw }); continue; }
+    var c = compute(it, decMode);
+    c.raw = it.raw;
+    c.warn = it.warn;
+    c.item = it;
+    c.v = verify(it, c);
+    rows.push(c);
+  }
+  lastRows = rows;
+
+  var tbl = el('tbl'), wrap = el('tblwrap'), stat = el('stat2');
+  if (!rows.length) {
+    wrap.style.display = 'none';
+    stat.innerHTML = '';
+    setBadge('', '待输入');
+    return;
+  }
+
+  var h = '<thead><tr><th>#</th><th>输入</th><th>基本尺寸</th><th>上偏差</th><th>下偏差</th>' +
+          '<th>最大极限</th><th>最小极限</th><th>公差</th><th>中间值</th><th>校验</th></tr></thead><tbody>';
+  var passCount = 0, warnCount = 0, failCount = 0;
+
+  for (var j = 0; j < rows.length; j++) {
+    var row = rows[j];
+    if (row.err) {
+      failCount++;
+      h += '<tr><td>' + (j + 1) + '</td><td class="err" colspan="9">' + escHtml(row.raw) + ' —— ' + row.err + '</td></tr>';
+      continue;
+    }
+    var dd = row.dec;
+    var cls, mark;
+    if (!row.v.ok) { cls = 'fail'; mark = '✖'; failCount++; }
+    else if (row.v.warn) { cls = 'warn'; mark = '⚠'; warnCount++; }
+    else { cls = 'ok'; mark = '✔'; passCount++; }
+
+    h += '<tr data-idx="' + j + '"><td>' + (j + 1) + '</td><td>' + escHtml(row.raw) + '</td>' +
+      '<td>' + fmt(row.nominal, dd) + '</td>' +
+      '<td>' + sgn(row.es, dd) + '</td>' +
+      '<td>' + sgn(row.ei, dd) + '</td>' +
+      '<td>' + fmt(row.hi, dd) + '</td>' +
+      '<td>' + fmt(row.lo, dd) + '</td>' +
+      '<td>' + fmt(row.tol, dd) + '</td>' +
+      '<td class="mid">' + fmt(row.mid, dd) + '</td>' +
+      '<td class="chk ' + cls + '">' + mark + '</td></tr>';
+  }
+  h += '</tbody>';
+  tbl.innerHTML = h;
+  wrap.style.display = 'block';
+
+  stat.innerHTML = '<span class="pill">共 ' + rows.length + ' 行</span>' +
+    '<span class="pill ok">校验通过 ' + passCount + '</span>' +
+    '<span class="pill warn">有提示 ' + warnCount + '</span>' +
+    '<span class="pill err">异常 ' + failCount + '</span>' +
+    (skipped ? '<span class="pill">跳过 ' + skipped + ' 行（表头/说明）</span>' : '');
+
+  if (failCount) setBadge('err', '有 ' + failCount + ' 行异常');
+  else if (warnCount) setBadge('warn', warnCount + ' 行有提示');
+  else setBadge('ok', '全部校验通过');
+  saveState();
+}
+
+function batchTableText(){
+  var ok = lastRows.filter(function(r){ return !r.err; });
+  if (!ok.length) return '';
+  var out = [];
+  out.push(['基本尺寸', '上偏差', '下偏差', '最大极限', '最小极限', '公差', '中间值', '校验'].join('\t'));
+  for (var i = 0; i < ok.length; i++) {
+    var r = ok[i], d = r.dec;
+    out.push([fmt(r.nominal, d), sgn(r.es, d), sgn(r.ei, d), fmt(r.hi, d), fmt(r.lo, d),
+      fmt(r.tol, d), fmt(r.mid, d), (r.v.ok ? (r.v.warn ? '有提示' : '通过') : '异常')].join('\t'));
+  }
+  return out.join('\n');
+}
+
+function batchMidText(){
+  var ok = lastRows.filter(function(r){ return !r.err; });
+  var out = [];
+  for (var i = 0; i < ok.length; i++) out.push(fmt(ok[i].mid, ok[i].dec));
+  return out.join('\n');
+}
+
+function fillDec(sel){
+  var opts = [['auto', '自动'], ['0', '0 位'], ['1', '1 位'], ['2', '2 位'], ['3', '3 位'], ['4', '4 位'], ['5', '5 位'], ['6', '6 位']];
+  var h = '';
+  for (var i = 0; i < opts.length; i++) h += '<option value="' + opts[i][0] + '">' + opts[i][1] + '</option>';
+  sel.innerHTML = h;
+}
+
+function saveState(){
+  try {
+    localStorage.setItem('tolcalc.last', JSON.stringify({
+      nom: el('nom').value, es: el('es').value, ei: el('ei').value,
+      actual: el('actual').value, bulk: el('bulk').value
+    }));
+  } catch (e) {}
+}
+
+function loadState(){
+  try {
+    var s = localStorage.getItem('tolcalc.last');
+    return s ? JSON.parse(s) : null;
+  } catch (e) { return null; }
+}
+
+function saveState(){
+  try {
+    localStorage.setItem('tolcalc.last', JSON.stringify({
+      nom: el('nom').value, es: el('es').value, ei: el('ei').value,
+      actual: el('actual').value, bulk: el('bulk').value
+    }));
+  } catch (e) {}
+}
+
+function loadState(){
+  try {
+    var s = localStorage.getItem('tolcalc.last');
+    return s ? JSON.parse(s) : null;
+  } catch (e) { return null; }
+}
+
+function init(){
+  fillDec(el('dec1'));
+  fillDec(el('dec2'));
+
+  try {
+    var s = localStorage.getItem('tolcalc.dec');
+    if (s) { el('dec1').value = s; el('dec2').value = s; }
+  } catch (e) {}
+
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) {
+    (function(btn){
+      btn.addEventListener('click', function(){
+        var all = document.querySelectorAll('.tab');
+        for (var k = 0; k < all.length; k++) all[k].classList.remove('active');
+        btn.classList.add('active');
+        var pages = document.querySelectorAll('.page');
+        for (var m = 0; m < pages.length; m++) pages[m].classList.remove('active');
+        var p = el('page-' + btn.getAttribute('data-page'));
+        if (p) p.classList.add('active');
+        if (btn.getAttribute('data-page') === 'single') el('quick').focus();
+      });
+    })(tabs[i]);
+  }
+
+  el('quick').addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter') {
+      var it = parseLine(el('quick').value, true);   /* 整行输入用严格模式 */
+      if (!it || it.err) { toast(it && it.err ? it.err : '没认出这个格式'); return; }
+      el('nom').value = fmt(it.nominal, it.decN);
+      el('es').value = sgn(it.es, it.decS);
+      el('ei').value = sgn(it.ei, it.decI);
+      runSingle();
+    }
+  });
+
+  ['nom', 'es', 'ei'].forEach(function(id){
+    el(id).addEventListener('input', runSingle);
+  });
+
+  el('calc1').addEventListener('click', runSingle);
+
+  el('actual').addEventListener('input', runActual);
+
+  el('clearActual').addEventListener('click', function(){
+    el('actual').value = '';
+    el('actres').innerHTML = '';
+    el('actual').focus();
+  });
+
+  el('copyReport').addEventListener('click', function(){
+    if (!lastSingle) { toast('还没有结果'); return; }
+    var r = lastSingle.r, v = lastSingle.v, d = r.dec;
+    var lines = [];
+    lines.push('尺寸中间值计算 · 校验报告');
+    lines.push('输入：D ' + fmt(r.nominal, d) + '   ES ' + sgn(r.es, d) + '   EI ' + sgn(r.ei, d));
+    lines.push('结果：中间值 ' + fmt(r.mid, d) + '   最大 ' + fmt(r.hi, d) + '   最小 ' + fmt(r.lo, d) + '   公差 ' + fmt(r.tol, d));
+    lines.push('结论：' + (v.ok ? (v.warn ? '校验通过（有提示）' : '校验通过') : '校验未通过') +
+      '（' + v.total + ' 项检查，异常 ' + v.fail + '，提示 ' + v.warn + '）');
+    lines.push('--------');
+    for (var i = 0; i < v.items.length; i++) {
+      var it = v.items[i];
+      lines.push((it.level === 'fail' ? '[×] ' : it.level === 'warn' ? '[!] ' : '[√] ') + it.name + ' | ' + it.detail);
+    }
+    var act = parseNumField(el('actual').value);
+    if (!act.empty && !isNaN(act.v)) {
+      var pass = act.v >= r.lo - 1e-9 && act.v <= r.hi + 1e-9;
+      lines.push('--------');
+      lines.push('实测值 ' + fmt(act.v, d) + ' → ' + (pass ? '合格' : '超差') + '（相对中间值 ' + sgn(act.v - r.mid, d) + '）');
+    }
+    copyText(lines.join('\n'));
+  });
+
+  el('res1').addEventListener('click', function(ev){
+    var t = ev.target;
+    var c = (t && t.closest) ? t.closest('.card') : null;
+    if (!c) return;
+    var v = c.getAttribute('data-copy');
+    if (v) copyText(v);
+  });
+
+  el('clear1').addEventListener('click', function(){
+    el('nom').value = '';
+    el('es').value = '';
+    el('ei').value = '';
+    el('quick').value = '';
+    el('res1').style.display = 'none';
+    el('note1').style.display = 'none';
+    el('vpanel').style.display = 'none';
+    el('actual').value = '';
+    el('actres').innerHTML = '';
+    lastSingle = null;
+    setBadge('', '待输入');
+    saveState();
+  });
+
+  el('copy1').addEventListener('click', function(){
+    /* 直接复用上一次屏幕上算好的结果。
+       原来这里拿输入框重算一遍，且漏了 runSingle 里的"上下偏差倒序重排"，
+       输入 238.25 -0.51 0.00 时屏幕显示公差 0.510，复制出来却是 -0.510。 */
+    if (!lastSingle) { toast('先算出结果再复制'); return; }
+    var r = lastSingle.r;
+    copyText('中间值\t' + fmt(r.mid, r.dec) + '\n最大极限\t' + fmt(r.hi, r.dec) +
+      '\n最小极限\t' + fmt(r.lo, r.dec) + '\n公差\t' + fmt(r.tol, r.dec));
+  });
+
+  el('calc2').addEventListener('click', runBatch);
+
+  el('tbl').addEventListener('click', function(ev){
+    var tr = ev.target;
+    while (tr && tr.tagName !== 'TR') tr = tr.parentNode;
+    if (!tr || !tr.getAttribute) return;
+    var idx = tr.getAttribute('data-idx');
+    if (idx === null) return;
+
+    var wasOpen = tr.getAttribute('data-open') === '1';
+    var olds = el('tbl').querySelectorAll('tr.rowdetail');
+    for (var i = 0; i < olds.length; i++) olds[i].parentNode.removeChild(olds[i]);
+    var marks = el('tbl').querySelectorAll('tr[data-open]');
+    for (var m = 0; m < marks.length; m++) marks[m].setAttribute('data-open', '0');
+    if (wasOpen) return;
+
+    var row = lastRows[parseInt(idx, 10)];
+    if (!row || row.err || !row.v) return;
+    tr.setAttribute('data-open', '1');
+
+    var hh = '<div class="rowv"><div class="rowvh">第 ' + (parseInt(idx, 10) + 1) + ' 行校验明细（' + escHtml(row.raw) + '）</div><ul class="vlist">';
+    for (var k = 0; k < row.v.items.length; k++) {
+      var it = row.v.items[k];
+      var mk = it.level === 'fail' ? '×' : (it.level === 'warn' ? '!' : '✓');
+      hh += '<li class="' + it.level + '"><div class="i">' + mk + '</div><div>' +
+        '<div class="nm">' + it.name + '</div><div class="dt">' + it.detail + '</div></div></li>';
+    }
+    hh += '</ul></div>';
+
+    var det = document.createElement('tr');
+    det.className = 'rowdetail';
+    var tdc = document.createElement('td');
+    tdc.colSpan = 10;
+    tdc.innerHTML = hh;
+    det.appendChild(tdc);
+    tr.parentNode.insertBefore(det, tr.nextSibling);
+  });
+
+  el('bulk').addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); runBatch(); }
+  });
+
+  el('sample').addEventListener('click', function(){
+    el('bulk').value = '238.25 0.00 -0.51\n120 0.05 -0.05\n45.5 +0.10/-0.02\n60±0.05\n32.4 -0.15\n86.2 0.02 -0.02';
+    runBatch();
+  });
+
+  el('clear2').addEventListener('click', function(){
+    el('bulk').value = '';
+    el('tblwrap').style.display = 'none';
+    el('stat2').innerHTML = '';
+    lastRows = [];
+    setBadge('', '待输入');
+    saveState();
+  });
+
+  el('copyAll').addEventListener('click', function(){
+    var t = batchTableText();
+    if (!t) { toast('还没有结果'); return; }
+    copyText(t);
+  });
+
+  el('copyMid').addEventListener('click', function(){
+    var t = batchMidText();
+    if (!t) { toast('还没有结果'); return; }
+    copyText(t);
+  });
+
+  el('exportCsv').addEventListener('click', function(){
+    var t = batchTableText();
+    if (!t) { toast('还没有结果'); return; }
+    var csv = '\ufeff' + t.split('\n').map(function(line){ return line.split('\t').join(','); }).join('\r\n');
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = '尺寸中间值计算结果.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+    toast('已导出 CSV');
+  });
+
+  el('dec1').addEventListener('change', function(){
+    try { localStorage.setItem('tolcalc.dec', el('dec1').value); } catch (e) {}
+    el('dec2').value = el('dec1').value;
+    runSingle();
+  });
+
+  el('dec2').addEventListener('change', function(){
+    try { localStorage.setItem('tolcalc.dec', el('dec2').value); } catch (e) {}
+    el('dec1').value = el('dec2').value;
+    if (lastRows.length) runBatch();
+  });
+
+  var st = loadState();
+  if (st) {
+    el('nom').value = st.nom || '';
+    el('es').value = st.es || '';
+    el('ei').value = st.ei || '';
+    el('actual').value = st.actual || '';
+    el('bulk').value = st.bulk || '';
+    if (st.nom || st.es || st.ei) runSingle();
+    if (st.bulk) runBatch();
+  }
+
+  var st = loadState();
+  if (st) {
+    el('nom').value = st.nom || '';
+    el('es').value = st.es || '';
+    el('ei').value = st.ei || '';
+    el('actual').value = st.actual || '';
+    el('bulk').value = st.bulk || '';
+    if (st.nom || st.es || st.ei) runSingle();
+    if (st.bulk) runBatch();
+  }
+
+  el('quick').focus();
+}
+
+if (typeof document !== 'undefined' && document.getElementById) {
+  init();
+}
+</script>
+</body>
+</html>
