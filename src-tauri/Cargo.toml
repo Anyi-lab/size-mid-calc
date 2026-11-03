@@ -14,8 +14,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [profile.release]
+# 保守配置：LTO + codegen-units=1 在 GitHub 的 7GB Windows runner 上
+# 容易在链接阶段被 OOM 杀掉，表现为 exit code 1 且只跑了几分钟。
 panic = "abort"
-codegen-units = 1
-lto = true
+codegen-units = 16
+lto = false
 opt-level = "s"
 strip = true

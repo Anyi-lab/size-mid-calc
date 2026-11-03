@@ -1,8 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "尺寸中间值计算",
+  "productName": "SizeMidCalc",
+  "mainBinaryName": "尺寸中间值计算",
   "version": "1.0.0",
-  "identifier": "com.workshop.size-mid-calc",
+  "identifier": "com.workshop.sizemidcalc",
   "build": {
     "frontendDist": "../src"
   },
@@ -27,8 +28,7 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis",
-      "msi"
+      "nsis"
     ],
     "icon": [
       "icons/32x32.png",

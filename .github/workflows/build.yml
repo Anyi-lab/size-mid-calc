@@ -18,12 +18,11 @@ jobs:
       - name: 安装 Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: 安装 Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # 缓存 cargo 依赖，第二次之后的构建会快很多
       - name: 缓存 Rust 依赖
         uses: Swatinem/rust-cache@v2
         with:
@@ -32,25 +31,51 @@ jobs:
       - name: 安装前端依赖
         run: npm install
 
+      - name: 校验 Tauri 配置
+        shell: pwsh
+        run: |
+          npx tauri info *>&1 | Tee-Object -FilePath tauri-info.txt
+
       - name: 编译 Tauri 应用
-        run: npm run tauri build
+        id: build_app
+        shell: pwsh
+        # 把编译输出同时写进文件，失败时随 artifact 一起下载
+        run: |
+          npx tauri build --verbose *>&1 | Tee-Object -FilePath build-log.txt
+          exit $LASTEXITCODE
+
+      - name: 上传构建日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            build-log.txt
+            tauri-info.txt
+          if-no-files-found: warn
 
       - name: 列出产物
+        if: always()
         run: |
-          Write-Host "=== 单文件 exe ==="
-          Get-ChildItem -Path src-tauri\target\release -Filter *.exe | Select-Object Name, Length
-          Write-Host "=== 安装包 ==="
-          Get-ChildItem -Path src-tauri\target\release\bundle -Recurse -Include *.msi,*.exe | Select-Object FullName, Length
+          Write-Host "=== release 目录 ==="
+          if (Test-Path src-tauri\target\release) {
+            Get-ChildItem -Path src-tauri\target\release -Filter *.exe -ErrorAction SilentlyContinue | Select-Object Name, Length
+          } else { Write-Host "release 目录不存在" }
+          Write-Host "=== bundle 目录 ==="
+          if (Test-Path src-tauri\target\release\bundle) {
+            Get-ChildItem -Path src-tauri\target\release\bundle -Recurse -Include *.msi,*.exe -ErrorAction SilentlyContinue | Select-Object FullName, Length
+          } else { Write-Host "bundle 目录不存在" }
 
       - name: 上传 exe（绿色单文件）
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: size-mid-calc-exe
-          # 用通配符，避免中文文件名或 productName 改动导致路径失配
           path: src-tauri/target/release/*.exe
           if-no-files-found: warn
 
       - name: 上传安装包（msi + nsis）
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: size-mid-calc-installer
